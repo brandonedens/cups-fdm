@@ -1,0 +1,38 @@
+#!/usr/bin/python
+# Brandon Edens
+# 2012-05-30
+#
+# All of this software is defined by the specification at:
+# http://www.cups.org/documentation.php/doc-1.6/api-filter.html
+
+import sys
+
+if __name__ == '__main__':
+
+    # Process the command line arguments
+    filename = None
+    options = None
+    copies = 1
+    job_name = ''
+    username = ''
+    job_id = None
+    argc = len(sys.argv)
+    if argc == 7:
+        filename = sys.argv[6]
+    if argc == 6:
+        options = sys.argv[5]
+    if argc == 5:
+        copies = int(sys.argv[4])
+    if argc == 4:
+        job_name = sys.argv[3]
+    if argc == 3:
+        username = sys.argv[2]
+    if argc == 2:
+        job_id  = sys.argv[1]
+
+    if argc == 1:
+        # Software was invoked during Cups add printer
+        print('direct fdm "FDM Printer" "FDM Printer (STL file processing)"');
+    sys.stderr.write("INFO: starting\n")
+    sys.stderr.write("CRIT: Not Implemented\n")
+
