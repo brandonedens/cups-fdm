@@ -5,7 +5,30 @@
 # All of this software is defined by the specification at:
 # http://www.cups.org/documentation.php/doc-1.6/api-filter.html
 
+import os
+import subprocess
+import shutil
 import sys
+import time
+from Printrun.pronsole import pronsole
+
+
+# Directory where Slic3r is installed.
+SLICER_DIR_NAME = '/usr/local/share/gcode/Slic3r'
+
+# Directory where the Slic3r configuration files are kept.
+SLICER_CONFIG_DIR = '/usr/local/share/gcode/TAM-S1-slic3r-configs'
+
+# Number of seconds to wait before attempting to print after connect
+CONNECT_DELAY = 3
+
+# FIXME this value will be removed
+LONG_SLEEP = 3000
+
+# Return codes for backend process
+CUPS_BACKEND_OK = 0
+CUPS_BACKEND_FAILED = 1
+
 
 if __name__ == '__main__':
 
@@ -33,6 +56,52 @@ if __name__ == '__main__':
     if argc == 1:
         # Software was invoked during Cups add printer
         print('direct fdm "FDM Printer" "FDM Printer (STL file processing)"');
-    sys.stderr.write("INFO: starting\n")
-    sys.stderr.write("CRIT: Not Implemented\n")
+        sys.exit(0)
 
+    if not filename:
+        sys.stderr.write("CRIT: Filename not specified, aborting...\n")
+        sys.exit(1)
+
+    # gather printer information
+    # device URI is of the form:
+    # fdm://ttyACM0/model=TAM.S1_EXP0523_Skrillex.ini
+    device_uri = os.getenv("DEVICE_URI")
+    tmp = device_uri.split("//")
+    port, model_txt = tmp[1].split('/')
+    model_lst = model_txt.split('=')
+    model_filename = model_lst[1]
+    sys.stderr.write('DEBUG: port is %s and model is %s\n' % (port, model_filename))
+
+    sys.stderr.write('INFO: starting job\n')
+
+    sys.stderr.write('INFO: slicing model\n')
+    # FIXME include options such as rotate in the printer URI
+    base_list = os.path.basename(filename).split('.')
+    base_filename = base_list[0]
+    shutil.copyfile(filename, '/tmp/%s.stl' % base_filename)
+    sys.stderr.write('DEBUG: cwd %s filename %s base_filename %s\n' % (os.getcwd(), filename, base_filename))
+    subprocess.call("%s/slic3r.pl --load %s/%s /tmp/%s.stl" % (SLICER_DIR_NAME, SLICER_CONFIG_DIR, model_filename, base_filename),
+                    shell=True)
+    output_filename = "%s.gcode" % base_filename
+    sys.stderr.write('DEBUG: base_filename %s output_filename %s filename %s\n' % (base_filename, output_filename, filename))
+
+    # Connecting to printer
+    sys.stderr.write('INFO: connecting to printer\n')
+    interp = pronsole()
+    baud = 230400
+    interp.do_connect('/dev/%s %d' % (port, baud))
+    time.sleep(CONNECT_DELAY)
+
+    sys.stderr.write('INFO: starting print\n')
+    interp.do_load('/tmp/%s' % output_filename)
+    interp.do_print('')
+
+    # Fixme this sleep needs to be transitioned into polling check on job status
+    time.sleep(LONG_SLEEP)
+
+    interp.do_disconnect('')
+
+    sys.stderr.write('INFO: completed job\n')
+
+
+    sys.exit(CUPS_BACKEND_OK)
